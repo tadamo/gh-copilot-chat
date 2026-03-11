@@ -76,6 +76,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         // File menu (for Print)
         let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(showWindow), keyEquivalent: "n"))
+        fileMenu.addItem(.separator())
         fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
         fileItem.submenu = fileMenu
         mainMenu.insertItem(fileItem, at: 1)
@@ -118,11 +120,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-
-            progressBar.topAnchor.constraint(equalTo: container.topAnchor),
-            progressBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            progressBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            progressBar.heightAnchor.constraint(equalToConstant: 3),
         ])
 
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
@@ -140,8 +137,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             defer: false
         )
         window.title = "GH Copilot Chat"
+        window.isReleasedWhenClosed = false
         window.contentView = container
         window.setFrameAutosaveName("GHCopilotChatWindow")
+
+        // Pin progress bar below the title bar using the content layout guide
+        let guide = window.contentLayoutGuide as! NSLayoutGuide
+        NSLayoutConstraint.activate([
+            progressBar.topAnchor.constraint(equalTo: guide.topAnchor),
+            progressBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            progressBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            progressBar.heightAnchor.constraint(equalToConstant: 3),
+        ])
+
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -151,6 +159,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     // MARK: - Actions
+
+    @objc func showWindow() {
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     @objc func reload() {
         webView.reload()
