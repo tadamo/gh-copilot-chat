@@ -56,6 +56,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         let fileMenu = NSMenu(title: "File")
         fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(showWindow), keyEquivalent: "n"))
         fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTabAction), keyEquivalent: "t"))
+        let newChatItem = NSMenuItem(title: "New Chat", action: #selector(newChatAction), keyEquivalent: "n")
+        newChatItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(newChatItem)
         fileMenu.addItem(NSMenuItem(title: "Close Tab", action: #selector(closeTabAction), keyEquivalent: "w"))
         fileMenu.addItem(.separator())
         fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
@@ -278,6 +281,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     // MARK: - Tab Actions
 
     @objc func newTabAction() { newTab() }
+
+    @objc func newChatAction() {
+        activeWebView.load(URLRequest(url: URL(string: "https://github.com/copilot")!))
+    }
 
     @objc func closeTabAction() { closeTab(at: activeTabIndex) }
 
