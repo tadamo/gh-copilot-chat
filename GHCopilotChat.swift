@@ -129,7 +129,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     func setupWindow() {
         tabBar = NSSegmentedControl()
         tabBar.trackingMode = .selectOne
-        tabBar.segmentStyle = .automatic
+        tabBar.segmentStyle = .texturedSquare
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         tabBar.target = self
         tabBar.action = #selector(tabSelected)
