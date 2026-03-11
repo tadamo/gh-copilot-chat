@@ -1,15 +1,34 @@
 import AppKit
 import WebKit
 
+class Tab {
+    let webView: WKWebView
+    var title: String = "New Tab"
+
+    init(configuration: WKWebViewConfiguration) {
+        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+        webView.allowsBackForwardNavigationGestures = true
+        webView.translatesAutoresizingMaskIntoConstraints = false
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
-    var webView: WKWebView!
     var progressBar: NSProgressIndicator!
+    var tabBar: NSSegmentedControl!
+    var webViewContainer: NSView!
+
+    var tabs: [Tab] = []
+    var activeTabIndex: Int = 0
+
+    var activeTab: Tab { tabs[activeTabIndex] }
+    var activeWebView: WKWebView { activeTab.webView }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenu()
         setupWindow()
-        loadCopilot()
+        newTab(url: URL(string: "https://github.com/copilot")!)
     }
 
     // MARK: - Menu
@@ -31,6 +50,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         appMenu.addItem(NSMenuItem(title: "Quit GH Copilot Chat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
+
+        // File menu
+        let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(showWindow), keyEquivalent: "n"))
+        fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTabAction), keyEquivalent: "t"))
+        fileMenu.addItem(NSMenuItem(title: "Close Tab", action: #selector(closeTabAction), keyEquivalent: "w"))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
+        fileItem.submenu = fileMenu
+        mainMenu.insertItem(fileItem, at: 1)
 
         // Edit menu
         let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
@@ -73,20 +103,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         // Window menu
         let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
         let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
         windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
         windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
+        windowMenu.addItem(.separator())
+        let prevTab = NSMenuItem(title: "Show Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "{")
+        prevTab.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(prevTab)
+        let nextTab = NSMenuItem(title: "Show Next Tab", action: #selector(selectNextTab), keyEquivalent: "}")
+        nextTab.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(nextTab)
+        windowMenu.addItem(.separator())
+        for i in 1...9 {
+            let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "\(i)")
+            item.tag = i - 1
+            windowMenu.addItem(item)
+        }
         windowItem.submenu = windowMenu
         mainMenu.addItem(windowItem)
-
-        // File menu (for Print)
-        let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
-        let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(showWindow), keyEquivalent: "n"))
-        fileMenu.addItem(.separator())
-        fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
-        fileItem.submenu = fileMenu
-        mainMenu.insertItem(fileItem, at: 1)
 
         NSApp.mainMenu = mainMenu
     }
@@ -94,18 +127,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     // MARK: - Window
 
     func setupWindow() {
-        let config = WKWebViewConfiguration()
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        tabBar = NSSegmentedControl()
+        tabBar.trackingMode = .selectOne
+        tabBar.segmentStyle = .automatic
+        tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.target = self
+        tabBar.action = #selector(tabSelected)
 
-        webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
-        webView.allowsBackForwardNavigationGestures = true
-        webView.addObserver(self, forKeyPath: #keyPath(WKWebView.title), options: .new, context: nil)
-        webView.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
-
-        // Progress bar
         progressBar = NSProgressIndicator()
         progressBar.style = .bar
         progressBar.isIndeterminate = false
@@ -115,18 +143,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         progressBar.translatesAutoresizingMaskIntoConstraints = false
         progressBar.isHidden = true
 
-        // Container view so we can overlay the progress bar at the top
-        let container = NSView()
-        container.addSubview(webView)
-        container.addSubview(progressBar)
+        webViewContainer = NSView()
+        webViewContainer.translatesAutoresizingMaskIntoConstraints = false
 
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: container.topAnchor),
-            webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-        ])
+        let container = NSView()
+        container.addSubview(tabBar)
+        container.addSubview(progressBar)
+        container.addSubview(webViewContainer)
 
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
         let windowRect = NSRect(
@@ -147,21 +170,129 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         window.contentView = container
         window.setFrameAutosaveName("GHCopilotChatWindow")
 
-        // Pin progress bar below the title bar using the content layout guide
         let guide = window.contentLayoutGuide as! NSLayoutGuide
         NSLayoutConstraint.activate([
-            progressBar.topAnchor.constraint(equalTo: guide.topAnchor),
+            tabBar.topAnchor.constraint(equalTo: guide.topAnchor),
+            tabBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            tabBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+            progressBar.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
             progressBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             progressBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             progressBar.heightAnchor.constraint(equalToConstant: 3),
+
+            webViewContainer.topAnchor.constraint(equalTo: progressBar.bottomAnchor),
+            webViewContainer.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            webViewContainer.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            webViewContainer.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
 
         window.makeKeyAndOrderFront(nil)
     }
 
-    func loadCopilot() {
-        let url = URL(string: "https://github.com/copilot")!
-        webView.load(URLRequest(url: url))
+    // MARK: - Tab Management
+
+    private func makeWebViewConfig() -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        return config
+    }
+
+    @discardableResult
+    func newTab(url: URL = URL(string: "https://github.com/copilot")!) -> Tab {
+        let tab = Tab(configuration: makeWebViewConfig())
+        tab.webView.navigationDelegate = self
+        tab.webView.uiDelegate = self
+        tab.webView.addObserver(self, forKeyPath: #keyPath(WKWebView.title), options: .new, context: nil)
+        tab.webView.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
+
+        tabs.append(tab)
+        activeTabIndex = tabs.count - 1
+
+        updateTabBar()
+        showActiveTab()
+        tab.webView.load(URLRequest(url: url))
+
+        return tab
+    }
+
+    func closeTab(at index: Int) {
+        guard tabs.count > 1 else {
+            window.performClose(nil)
+            return
+        }
+
+        let tab = tabs[index]
+        tab.webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.title))
+        tab.webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress))
+
+        tabs.remove(at: index)
+
+        if activeTabIndex >= tabs.count {
+            activeTabIndex = tabs.count - 1
+        } else if activeTabIndex > index {
+            activeTabIndex -= 1
+        }
+
+        updateTabBar()
+        showActiveTab()
+    }
+
+    func switchTab(to index: Int) {
+        guard index >= 0 && index < tabs.count else { return }
+        activeTabIndex = index
+        updateTabBar()
+        showActiveTab()
+
+        let progress = activeWebView.estimatedProgress
+        progressBar.doubleValue = progress
+        progressBar.isHidden = progress >= 1.0
+    }
+
+    private func showActiveTab() {
+        for subview in webViewContainer.subviews {
+            subview.removeFromSuperview()
+        }
+
+        let wv = activeWebView
+        webViewContainer.addSubview(wv)
+        NSLayoutConstraint.activate([
+            wv.topAnchor.constraint(equalTo: webViewContainer.topAnchor),
+            wv.leadingAnchor.constraint(equalTo: webViewContainer.leadingAnchor),
+            wv.trailingAnchor.constraint(equalTo: webViewContainer.trailingAnchor),
+            wv.bottomAnchor.constraint(equalTo: webViewContainer.bottomAnchor),
+        ])
+
+        window.title = activeTab.title
+    }
+
+    private func updateTabBar() {
+        tabBar.segmentCount = tabs.count
+        for (i, tab) in tabs.enumerated() {
+            tabBar.setLabel(tab.title, forSegment: i)
+            tabBar.setWidth(0, forSegment: i)
+        }
+        tabBar.selectedSegment = activeTabIndex
+    }
+
+    // MARK: - Tab Actions
+
+    @objc func newTabAction() { newTab() }
+
+    @objc func closeTabAction() { closeTab(at: activeTabIndex) }
+
+    @objc func tabSelected() { switchTab(to: tabBar.selectedSegment) }
+
+    @objc func selectPreviousTab() {
+        switchTab(to: (activeTabIndex - 1 + tabs.count) % tabs.count)
+    }
+
+    @objc func selectNextTab() {
+        switchTab(to: (activeTabIndex + 1) % tabs.count)
+    }
+
+    @objc func selectTabByNumber(_ sender: NSMenuItem) {
+        switchTab(to: sender.tag)
     }
 
     // MARK: - Actions
@@ -171,32 +302,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc func reload() {
-        webView.reload()
-    }
+    @objc func reload() { activeWebView.reload() }
 
     @objc func goBack() {
-        if webView.canGoBack { webView.goBack() }
+        if activeWebView.canGoBack { activeWebView.goBack() }
     }
 
     @objc func goForward() {
-        if webView.canGoForward { webView.goForward() }
+        if activeWebView.canGoForward { activeWebView.goForward() }
     }
 
     @objc func zoomIn() {
-        webView.pageZoom = min(webView.pageZoom + 0.1, 3.0)
+        activeWebView.pageZoom = min(activeWebView.pageZoom + 0.1, 3.0)
     }
 
     @objc func zoomOut() {
-        webView.pageZoom = max(webView.pageZoom - 0.1, 0.5)
+        activeWebView.pageZoom = max(activeWebView.pageZoom - 0.1, 0.5)
     }
 
     @objc func zoomReset() {
-        webView.pageZoom = 1.0
+        activeWebView.pageZoom = 1.0
     }
 
     @objc func openInBrowser() {
-        if let url = webView.url {
+        if let url = activeWebView.url {
             NSWorkspace.shared.open(url)
         }
     }
@@ -210,13 +339,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     @objc func printPage() {
-        let printOp = webView.printOperation(with: NSPrintInfo.shared)
+        let printOp = activeWebView.printOperation(with: NSPrintInfo.shared)
         printOp.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
 
     @objc func findInPage() {
-        // Forward Cmd+F into the webview via the responder chain
-        window.makeFirstResponder(webView)
+        window.makeFirstResponder(activeWebView)
         let event = NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -229,22 +357,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             isARepeat: false,
             keyCode: 3
         )
-        if let event { webView.keyDown(with: event) }
+        if let event { activeWebView.keyDown(with: event) }
     }
 
     // MARK: - KVO
 
     override func observeValue(forKeyPath keyPath: String?, of object: Any?,
                                change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+        guard let webView = object as? WKWebView,
+              let tabIndex = tabs.firstIndex(where: { $0.webView === webView }) else { return }
+
         switch keyPath {
         case #keyPath(WKWebView.title):
-            if let title = webView.title, !title.isEmpty {
+            let title = webView.title?.isEmpty == false ? webView.title! : "New Tab"
+            tabs[tabIndex].title = title
+            updateTabBar()
+            if tabIndex == activeTabIndex {
                 window.title = title
             }
         case #keyPath(WKWebView.estimatedProgress):
-            let progress = webView.estimatedProgress
-            progressBar.doubleValue = progress
-            progressBar.isHidden = progress >= 1.0
+            if tabIndex == activeTabIndex {
+                let progress = webView.estimatedProgress
+                progressBar.doubleValue = progress
+                progressBar.isHidden = progress >= 1.0
+            }
         default:
             break
         }
@@ -272,7 +408,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
                  for navigationAction: WKNavigationAction,
                  windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url {
-            webView.load(URLRequest(url: url))
+            newTab(url: url)
         }
         return nil
     }
