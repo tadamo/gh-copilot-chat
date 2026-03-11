@@ -415,7 +415,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
                  for navigationAction: WKNavigationAction,
                  windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url {
-            newTab(url: url)
+            NSWorkspace.shared.open(url)
         }
         return nil
     }
