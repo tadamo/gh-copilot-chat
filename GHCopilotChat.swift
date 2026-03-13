@@ -305,8 +305,15 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var windowControllers: [WindowController] = []
+
+    var windowMenu: NSMenu!
+    var tabSectionSeparator: NSMenuItem!
+    var prevTabMenuItem: NSMenuItem!
+    var nextTabMenuItem: NSMenuItem!
+    var tabListSeparator: NSMenuItem!
+    var tabNumberItems: [NSMenuItem] = []
 
     var activeWindowController: WindowController? {
         let keyWindow = NSApp.keyWindow ?? NSApp.mainWindow
@@ -407,23 +414,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
         windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
-        windowMenu.addItem(.separator())
-        let prevTab = NSMenuItem(title: "Show Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "{")
-        prevTab.keyEquivalentModifierMask = [.command]
-        windowMenu.addItem(prevTab)
-        let nextTab = NSMenuItem(title: "Show Next Tab", action: #selector(selectNextTab), keyEquivalent: "}")
-        nextTab.keyEquivalentModifierMask = [.command]
-        windowMenu.addItem(nextTab)
-        windowMenu.addItem(.separator())
+        tabSectionSeparator = NSMenuItem.separator()
+        windowMenu.addItem(tabSectionSeparator)
+        prevTabMenuItem = NSMenuItem(title: "Show Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "{")
+        prevTabMenuItem.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(prevTabMenuItem)
+        nextTabMenuItem = NSMenuItem(title: "Show Next Tab", action: #selector(selectNextTab), keyEquivalent: "}")
+        nextTabMenuItem.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(nextTabMenuItem)
+        tabListSeparator = NSMenuItem.separator()
+        windowMenu.addItem(tabListSeparator)
         for i in 1...9 {
             let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "\(i)")
             item.tag = i - 1
             windowMenu.addItem(item)
+            tabNumberItems.append(item)
         }
+        self.windowMenu = windowMenu
+        windowMenu.delegate = self
         windowItem.submenu = windowMenu
         mainMenu.addItem(windowItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    // MARK: - Menu Delegate
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === windowMenu else { return }
+        let tabCount = activeWindowController?.tabs.count ?? 0
+        let hasWindow = tabCount > 0
+        tabSectionSeparator.isHidden = !hasWindow
+        prevTabMenuItem.isHidden = !hasWindow
+        nextTabMenuItem.isHidden = !hasWindow
+        tabListSeparator.isHidden = !hasWindow
+        for (i, item) in tabNumberItems.enumerated() {
+            item.isHidden = i >= tabCount
+        }
     }
 
     // MARK: - Actions
