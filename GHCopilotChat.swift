@@ -13,7 +13,7 @@ class Tab {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
     var progressBar: NSProgressIndicator!
     var tabBar: NSSegmentedControl!
@@ -25,111 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     var activeTab: Tab { tabs[activeTabIndex] }
     var activeWebView: WKWebView { activeTab.webView }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        setupMenu()
-        setupWindow()
-        newTab(url: URL(string: "https://github.com/copilot")!)
-    }
-
-    // MARK: - Menu
-
-    func setupMenu() {
-        let mainMenu = NSMenu()
-
-        // App menu
-        let appItem = NSMenuItem()
-        let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: "About GH Copilot Chat", action: #selector(showAbout), keyEquivalent: ""))
-        appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Hide GH Copilot Chat", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
-        let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
-        hideOthers.keyEquivalentModifierMask = [.command, .option]
-        appMenu.addItem(hideOthers)
-        appMenu.addItem(NSMenuItem(title: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
-        appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Quit GH Copilot Chat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        appItem.submenu = appMenu
-        mainMenu.addItem(appItem)
-
-        // File menu
-        let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
-        let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(showWindow), keyEquivalent: "n"))
-        fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTabAction), keyEquivalent: "t"))
-        let newChatItem = NSMenuItem(title: "New Chat", action: #selector(newChatAction), keyEquivalent: "n")
-        newChatItem.keyEquivalentModifierMask = [.command, .shift]
-        fileMenu.addItem(newChatItem)
-        fileMenu.addItem(NSMenuItem(title: "Close Tab", action: #selector(closeTabAction), keyEquivalent: "w"))
-        fileMenu.addItem(.separator())
-        fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
-        fileItem.submenu = fileMenu
-        mainMenu.insertItem(fileItem, at: 1)
-
-        // Edit menu
-        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
-        let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
-        redoItem.keyEquivalentModifierMask = [.command, .shift]
-        editMenu.addItem(redoItem)
-        editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
-        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
-        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
-        editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(title: "Find...", action: #selector(findInPage), keyEquivalent: "f"))
-        editItem.submenu = editMenu
-        mainMenu.addItem(editItem)
-
-        // View menu
-        let viewItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
-        let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(NSMenuItem(title: "Reload", action: #selector(reload), keyEquivalent: "r"))
-        viewMenu.addItem(.separator())
-        viewMenu.addItem(NSMenuItem(title: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+"))
-        viewMenu.addItem(NSMenuItem(title: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-"))
-        viewMenu.addItem(NSMenuItem(title: "Actual Size", action: #selector(zoomReset), keyEquivalent: "0"))
-        viewMenu.addItem(.separator())
-        viewMenu.addItem(NSMenuItem(title: "Open in Browser", action: #selector(openInBrowser), keyEquivalent: "o"))
-        viewItem.submenu = viewMenu
-        mainMenu.addItem(viewItem)
-
-        // History menu
-        let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
-        let historyMenu = NSMenu(title: "History")
-        historyMenu.addItem(NSMenuItem(title: "Back", action: #selector(goBack), keyEquivalent: "["))
-        historyMenu.addItem(NSMenuItem(title: "Forward", action: #selector(goForward), keyEquivalent: "]"))
-        historyItem.submenu = historyMenu
-        mainMenu.addItem(historyItem)
-
-        // Window menu
-        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
-        let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
-        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
-        windowMenu.addItem(.separator())
-        let prevTab = NSMenuItem(title: "Show Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "{")
-        prevTab.keyEquivalentModifierMask = [.command]
-        windowMenu.addItem(prevTab)
-        let nextTab = NSMenuItem(title: "Show Next Tab", action: #selector(selectNextTab), keyEquivalent: "}")
-        nextTab.keyEquivalentModifierMask = [.command]
-        windowMenu.addItem(nextTab)
-        windowMenu.addItem(.separator())
-        for i in 1...9 {
-            let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "\(i)")
-            item.tag = i - 1
-            windowMenu.addItem(item)
-        }
-        windowItem.submenu = windowMenu
-        mainMenu.addItem(windowItem)
-
-        NSApp.mainMenu = mainMenu
-    }
-
-    // MARK: - Window
-
-    func setupWindow() {
+    func setup() {
         tabBar = NSSegmentedControl()
         tabBar.trackingMode = .selectOne
         tabBar.segmentStyle = .texturedSquare
@@ -171,7 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         window.title = "GH Copilot Chat"
         window.isReleasedWhenClosed = false
         window.contentView = container
-        window.setFrameAutosaveName("GHCopilotChatWindow")
+        window.delegate = self
 
         let guide = window.contentLayoutGuide as! NSLayoutGuide
         NSLayoutConstraint.activate([
@@ -191,6 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         ])
 
         window.makeKeyAndOrderFront(nil)
+        newTab(url: URL(string: "https://github.com/copilot")!)
     }
 
     // MARK: - Tab Management
@@ -280,77 +177,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
 
     // MARK: - Tab Actions
 
-    @objc func newTabAction() { newTab() }
-
-    @objc func newChatAction() {
-        activeWebView.load(URLRequest(url: URL(string: "https://github.com/copilot")!))
-    }
-
-    @objc func closeTabAction() { closeTab(at: activeTabIndex) }
-
     @objc func tabSelected() { switchTab(to: tabBar.selectedSegment) }
 
-    @objc func selectPreviousTab() {
+    func selectPreviousTab() {
         switchTab(to: (activeTabIndex - 1 + tabs.count) % tabs.count)
     }
 
-    @objc func selectNextTab() {
+    func selectNextTab() {
         switchTab(to: (activeTabIndex + 1) % tabs.count)
     }
 
-    @objc func selectTabByNumber(_ sender: NSMenuItem) {
-        switchTab(to: sender.tag)
-    }
+    // MARK: - Window Actions
 
-    // MARK: - Actions
+    func reload() { activeWebView.reload() }
 
-    @objc func showWindow() {
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    @objc func reload() { activeWebView.reload() }
-
-    @objc func goBack() {
+    func goBack() {
         if activeWebView.canGoBack { activeWebView.goBack() }
     }
 
-    @objc func goForward() {
+    func goForward() {
         if activeWebView.canGoForward { activeWebView.goForward() }
     }
 
-    @objc func zoomIn() {
+    func zoomIn() {
         activeWebView.pageZoom = min(activeWebView.pageZoom + 0.1, 3.0)
     }
 
-    @objc func zoomOut() {
+    func zoomOut() {
         activeWebView.pageZoom = max(activeWebView.pageZoom - 0.1, 0.5)
     }
 
-    @objc func zoomReset() {
+    func zoomReset() {
         activeWebView.pageZoom = 1.0
     }
 
-    @objc func openInBrowser() {
+    func openInBrowser() {
         if let url = activeWebView.url {
             NSWorkspace.shared.open(url)
         }
     }
 
-    @objc func showAbout() {
-        NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "GH Copilot Chat",
-            .version: "1.0",
-            .credits: NSAttributedString(string: "A native Mac wrapper for GitHub Copilot chat.")
-        ])
-    }
-
-    @objc func printPage() {
+    func printPage() {
         let printOp = activeWebView.printOperation(with: NSPrintInfo.shared)
         printOp.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
 
-    @objc func findInPage() {
+    func findInPage() {
         window.makeFirstResponder(activeWebView)
         let event = NSEvent.keyEvent(
             with: .keyDown,
@@ -366,6 +238,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         )
         if let event { activeWebView.keyDown(with: event) }
     }
+
+    func newChatAction() {
+        activeWebView.load(URLRequest(url: URL(string: "https://github.com/copilot")!))
+    }
+
+    func closeTabAction() { closeTab(at: activeTabIndex) }
 
     // MARK: - KVO
 
@@ -420,13 +298,188 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         return nil
     }
 
+    // MARK: - Window Delegate
+
+    func windowWillClose(_ notification: Notification) {
+        (NSApp.delegate as? AppDelegate)?.removeWindowController(self)
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var windowControllers: [WindowController] = []
+
+    var activeWindowController: WindowController? {
+        let keyWindow = NSApp.keyWindow ?? NSApp.mainWindow
+        return windowControllers.first { $0.window === keyWindow }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupMenu()
+        createNewWindow()
+    }
+
+    @discardableResult
+    func createNewWindow() -> WindowController {
+        let wc = WindowController()
+        wc.setup()
+        windowControllers.append(wc)
+        return wc
+    }
+
+    func removeWindowController(_ wc: WindowController) {
+        windowControllers.removeAll { $0 === wc }
+    }
+
+    // MARK: - Menu
+
+    func setupMenu() {
+        let mainMenu = NSMenu()
+
+        // App menu
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "About GH Copilot Chat", action: #selector(showAbout), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Hide GH Copilot Chat", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(hideOthers)
+        appMenu.addItem(NSMenuItem(title: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Quit GH Copilot Chat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        // File menu
+        let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(newWindowAction), keyEquivalent: "n"))
+        fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTabAction), keyEquivalent: "t"))
+        let newChatItem = NSMenuItem(title: "New Chat", action: #selector(newChatAction), keyEquivalent: "n")
+        newChatItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(newChatItem)
+        fileMenu.addItem(NSMenuItem(title: "Close Tab", action: #selector(closeTabAction), keyEquivalent: "w"))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(NSMenuItem(title: "Print...", action: #selector(printPage), keyEquivalent: "p"))
+        fileItem.submenu = fileMenu
+        mainMenu.addItem(fileItem)
+
+        // Edit menu
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+        let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redoItem)
+        editMenu.addItem(.separator())
+        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenu.addItem(.separator())
+        editMenu.addItem(NSMenuItem(title: "Find...", action: #selector(findInPage), keyEquivalent: "f"))
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        // View menu
+        let viewItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
+        let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(NSMenuItem(title: "Reload", action: #selector(reload), keyEquivalent: "r"))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(NSMenuItem(title: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+"))
+        viewMenu.addItem(NSMenuItem(title: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-"))
+        viewMenu.addItem(NSMenuItem(title: "Actual Size", action: #selector(zoomReset), keyEquivalent: "0"))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(NSMenuItem(title: "Open in Browser", action: #selector(openInBrowser), keyEquivalent: "o"))
+        viewItem.submenu = viewMenu
+        mainMenu.addItem(viewItem)
+
+        // History menu
+        let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
+        let historyMenu = NSMenu(title: "History")
+        historyMenu.addItem(NSMenuItem(title: "Back", action: #selector(goBack), keyEquivalent: "["))
+        historyMenu.addItem(NSMenuItem(title: "Forward", action: #selector(goForward), keyEquivalent: "]"))
+        historyItem.submenu = historyMenu
+        mainMenu.addItem(historyItem)
+
+        // Window menu
+        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
+        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
+        windowMenu.addItem(.separator())
+        let prevTab = NSMenuItem(title: "Show Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "{")
+        prevTab.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(prevTab)
+        let nextTab = NSMenuItem(title: "Show Next Tab", action: #selector(selectNextTab), keyEquivalent: "}")
+        nextTab.keyEquivalentModifierMask = [.command]
+        windowMenu.addItem(nextTab)
+        windowMenu.addItem(.separator())
+        for i in 1...9 {
+            let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "\(i)")
+            item.tag = i - 1
+            windowMenu.addItem(item)
+        }
+        windowItem.submenu = windowMenu
+        mainMenu.addItem(windowItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    // MARK: - Actions
+
+    @objc func newWindowAction() {
+        createNewWindow()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func newTabAction() { activeWindowController?.newTab() }
+
+    @objc func newChatAction() { activeWindowController?.newChatAction() }
+
+    @objc func closeTabAction() { activeWindowController?.closeTabAction() }
+
+    @objc func reload() { activeWindowController?.reload() }
+
+    @objc func goBack() { activeWindowController?.goBack() }
+
+    @objc func goForward() { activeWindowController?.goForward() }
+
+    @objc func zoomIn() { activeWindowController?.zoomIn() }
+
+    @objc func zoomOut() { activeWindowController?.zoomOut() }
+
+    @objc func zoomReset() { activeWindowController?.zoomReset() }
+
+    @objc func openInBrowser() { activeWindowController?.openInBrowser() }
+
+    @objc func printPage() { activeWindowController?.printPage() }
+
+    @objc func findInPage() { activeWindowController?.findInPage() }
+
+    @objc func selectPreviousTab() { activeWindowController?.selectPreviousTab() }
+
+    @objc func selectNextTab() { activeWindowController?.selectNextTab() }
+
+    @objc func selectTabByNumber(_ sender: NSMenuItem) {
+        activeWindowController?.switchTab(to: sender.tag)
+    }
+
+    @objc func showAbout() {
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "GH Copilot Chat",
+            .version: "1.0",
+            .credits: NSAttributedString(string: "A native Mac wrapper for GitHub Copilot chat.")
+        ])
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         if !hasVisibleWindows {
-            window.makeKeyAndOrderFront(nil)
+            createNewWindow()
         }
         return true
     }
