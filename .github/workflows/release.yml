@@ -1,0 +1,26 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app
+        run: bash build.sh
+
+      - name: Zip app bundle
+        run: zip -r "GH.Copilot.Chat.zip" "GH Copilot Chat.app"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GH.Copilot.Chat.zip
+          generate_release_notes: true
