@@ -4,7 +4,17 @@ A lightweight native macOS app that wraps [GitHub Copilot Chat](https://github.c
 
 ![GH Copilot Chat](gh-copilot-chat.png)
 
-## Requirements
+## Installation
+
+### Download a Release
+
+Download the latest `GH Copilot Chat.app` from the [Releases](../../releases) page, unzip it, and drag it to your `/Applications` folder.
+
+> **First launch:** macOS Gatekeeper will block an unsigned app. Right-click the app and choose **Open**, then confirm in the dialog.
+
+### Build from Source
+
+#### Requirements
 
 - macOS 12.0 or later
 - Xcode Command Line Tools (provides `swiftc`)
@@ -15,9 +25,7 @@ If you don't have the command line tools installed:
 xcode-select --install
 ```
 
-## Getting Started
-
-### Build
+#### Build
 
 ```sh
 ./build.sh
@@ -25,13 +33,13 @@ xcode-select --install
 
 This compiles `GHCopilotChat.swift` and produces a `GH Copilot Chat.app` bundle in the current directory.
 
-### Install (optional)
+#### Install (optional)
 
 ```sh
 cp -r 'GH Copilot Chat.app' /Applications/
 ```
 
-### Run
+#### Run
 
 ```sh
 open 'GH Copilot Chat.app'
@@ -43,12 +51,16 @@ open 'GH Copilot Chat.app'
 
 - Loads `https://github.com/copilot` on startup
 - External (non-GitHub) links open in your default browser
+- Tab support — new tab (Cmd+T), close tab (Cmd+W), navigate tabs (Cmd+{ / Cmd+}), jump to tab by number (Cmd+1–9)
+- Multiple windows (Cmd+N)
+- New Chat shortcut (Cmd+Shift+N) — reloads GitHub Copilot in the current tab
 - Back/forward navigation with swipe gestures and History menu
-- Zoom controls (Cmd +/−/0)
+- Reload (Cmd+R)
+- Zoom controls (Cmd+/−/0)
 - Find in page (Cmd+F)
-- Print support
+- Open current page in default browser (Cmd+O)
+- Print support (Cmd+P)
 - Page load progress bar
-- Window position is remembered between launches
 
 ## Development
 
