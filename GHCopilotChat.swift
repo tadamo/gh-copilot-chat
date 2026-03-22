@@ -273,13 +273,16 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
 
     // MARK: - Navigation delegate
 
+    private func isCopilotURL(_ url: URL) -> Bool {
+        return url.absoluteString.hasPrefix("https://github.com/copilot")
+    }
+
     func webView(_ webView: WKWebView,
                  decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if let url = navigationAction.request.url,
            navigationAction.navigationType == .linkActivated {
-            let host = url.host ?? ""
-            if !host.contains("github.com") {
+            if !isCopilotURL(url) {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
@@ -293,6 +296,10 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
                  for navigationAction: WKNavigationAction,
                  windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url {
+            if isCopilotURL(url) {
+                let tab = newTab(url: url)
+                return tab.webView
+            }
             NSWorkspace.shared.open(url)
         }
         return nil
