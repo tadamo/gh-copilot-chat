@@ -281,12 +281,10 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
                  decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if let url = navigationAction.request.url,
-           navigationAction.navigationType == .linkActivated {
-            if !isCopilotURL(url) {
-                NSWorkspace.shared.open(url)
-                decisionHandler(.cancel)
-                return
-            }
+           !isCopilotURL(url) {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
         }
         decisionHandler(.allow)
     }
