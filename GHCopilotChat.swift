@@ -86,15 +86,23 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
             webViewContainer.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
 
+        if isPrivate {
+            window.title = "GH Copilot Chat — Private"
+        }
         window.makeKeyAndOrderFront(nil)
         newTab(url: URL(string: "https://github.com/copilot")!)
     }
 
     // MARK: - Tab Management
 
+    var isPrivate = false
+
     private func makeWebViewConfig() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        if isPrivate {
+            config.websiteDataStore = .nonPersistent()
+        }
         return config
     }
 
@@ -274,7 +282,15 @@ class WindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
     // MARK: - Navigation delegate
 
     private func isCopilotURL(_ url: URL) -> Bool {
-        return url.absoluteString.hasPrefix("https://github.com/copilot")
+        let urlString = url.absoluteString
+        let ssoPattern = #"^https://github\.com/(enterprises|orgs)/[^/]+/(sso|saml)"#
+        return urlString.hasPrefix("https://github.com/copilot")
+            || urlString.hasPrefix("https://github.com/login")
+            || urlString.hasPrefix("https://github.com/session")
+            || urlString.range(of: ssoPattern, options: .regularExpression) != nil
+            || urlString.hasPrefix("https://login.microsoftonline.com/")
+            || urlString.hasPrefix("https://autologon.microsoftazuread-sso.com/")
+            || urlString.range(of: #"^https://[^/]+\.duosecurity\.com/"#, options: .regularExpression) != nil
     }
 
     func webView(_ webView: WKWebView,
@@ -338,6 +354,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return wc
     }
 
+    @discardableResult
+    func createNewPrivateWindow() -> WindowController {
+        let wc = WindowController()
+        wc.isPrivate = true
+        wc.setup()
+        windowControllers.append(wc)
+        return wc
+    }
+
     func removeWindowController(_ wc: WindowController) {
         windowControllers.removeAll { $0 === wc }
     }
@@ -366,6 +391,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         let fileMenu = NSMenu(title: "File")
         fileMenu.addItem(NSMenuItem(title: "New Window", action: #selector(newWindowAction), keyEquivalent: "n"))
+        let newPrivateWindowItem = NSMenuItem(title: "New Private Window", action: #selector(newPrivateWindowAction), keyEquivalent: "p")
+        newPrivateWindowItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(newPrivateWindowItem)
         fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTabAction), keyEquivalent: "t"))
         let newChatItem = NSMenuItem(title: "New Chat", action: #selector(newChatAction), keyEquivalent: "n")
         newChatItem.keyEquivalentModifierMask = [.command, .shift]
@@ -462,6 +490,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func newWindowAction() {
         createNewWindow()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func newPrivateWindowAction() {
+        createNewPrivateWindow()
         NSApp.activate(ignoringOtherApps: true)
     }
 
